@@ -1,0 +1,18 @@
+1. Install package if not exists
+
+if("dplyr" %in% rownames(installed.packages()) == FALSE) {
+  install.packages("dplyr")
+}
+
+
+----
+
+2. Set Working Directory
+You can set working directory with absolute path but to set current scritp loaction as working directory
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+
+
+-----
+
