@@ -1,0 +1,427 @@
+---
+title: "R Notebook : Logistic Regression Case Study"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+```{r}
+" This is Logistic Regression Case Study"
+```
+Let us first Set the Working Directory
+
+```{r}
+getwd()
+```
+
+Set the working directory
+
+```{r}
+setwd("C:/Govinda/PU2376/project/Desktop/Desktop/Data Science/Edu Pristine/Yogesh Sir Batch/Logistic Regression/Case Study 3")
+
+getwd()
+```
+
+Let us add all the libraries here
+
+```{r}
+# Add All Packages Here
+
+library(dplyr)
+library(car)
+library(tidyr)
+library(dplyr)
+
+```
+
+Red the data
+
+```{r}
+data.temp.set =read.csv("train.csv" , stringsAsFactors = FALSE)
+library(dplyr)
+glimpse(data.temp.set)
+View(data.temp.set)
+summary(data.temp.set)
+
+```
+
+
+Now let us check the vairables which are having NA values are normal or not. We will be using the Shapiro.test() if there are 5000 or less rows
+
+We will use th anderson darling test for more data
+
+
+```{r}
+
+
+shapiro.test(data.temp.set$LoanAmount)
+# This is normal as the P value is less than 0.1
+
+#Replace the NA by the Mean
+data.temp.set$LoanAmount[is.na(data.temp.set$LoanAmount)] <- mean(data.temp.set$LoanAmount , na.rm = T )
+
+shapiro.test(data.temp.set$ApplicantIncome)
+# This is normal as the P value is less than 0.1
+
+#Replace the NA by the Mean
+data.temp.set$ApplicantIncome[is.na(data.temp.set$ApplicantIncome)] <- mean(data.temp.set$ApplicantIncome , na.rm = T )
+
+shapiro.test(data.temp.set$CoapplicantIncome)
+# This is normal as the P value is less than 0.1
+
+#Replace the NA by the Mean
+data.temp.set$CoapplicantIncome[is.na(data.temp.set$CoapplicantIncome)] <- mean(data.temp.set$CoapplicantIncome , na.rm = T )
+
+shapiro.test(data.temp.set$Loan_Amount_Term)
+# This is normal as the P value is less than 0.1
+#Replace the NA by the Mean
+data.temp.set$Loan_Amount_Term[is.na(data.temp.set$Loan_Amount_Term)] <- mean(data.temp.set$Loan_Amount_Term , na.rm = T )
+
+
+#Replace the NA in Credit History
+
+data.temp.set$Credit_History[is.na(data.temp.set$Credit_History)] <- 1
+
+table(data.temp.set$Credit_History)
+
+summary(data.temp.set)
+```
+
+Now we will create dummy variable for the Categorical Variable
+
+```{r}
+# Creating Dummy Variable for Gender
+#View the data
+#glimpse(data.temp.set)
+
+data.temp.set <- data.temp.set %>%
+  mutate(gender = as.numeric(Gender %in% c("Male" ,"")))%>%
+  select(-Gender)
+
+table(data.temp.set$gender)
+
+# Creating Dummy Variable for Married
+
+# View data of Married
+
+table(data.temp.set$Married)
+data.temp.set <- data.temp.set %>%
+  mutate(married = as.numeric(Married %in% c("Yes",""))) %>%
+  select(-Married)
+table(data.temp.set$married)
+
+# Creating Dummy Variable for Dependants
+#Checking the Dependatants Data
+
+table(data.temp.set$Dependents)
+data.temp.set <- data.temp.set %>%
+  mutate(depenant_0 = as.numeric(Dependents %in% c("0","")),
+         depenant_1 = as.numeric(Dependents== "1"),
+         depenant_2 = as.numeric(Dependents== "2"))%>%
+  select(-Dependents)
+
+# table(data.temp.set$depenant_0)
+#Creating Dummy Variable for Education
+
+table(data.temp.set$Education)
+data.temp.set <- data.temp.set %>%
+  mutate(education = as.numeric(Education == "Graduate"))%>%
+  select(-Education)
+
+#Creating Dummy Variable for Self Employed
+table(data.temp.set$Self_Employed)
+data.temp.set <-data.temp.set %>%
+  mutate(self_employed = as.numeric(Self_Employed %in% c("No",""))) %>%
+  select(-Self_Employed)
+table(data.temp.set$self_employed)
+
+
+#Creating Dummy Variables for Loan Status
+
+table(data.temp.set$Loan_Status)
+data.temp.set <- data.temp.set %>%
+  mutate( loan_status = as.numeric(Loan_Status=="Y"))%>%
+  select(-Loan_Status)
+
+table(data.temp.set$ Property_Area)
+#Creating Dummy Variables for Property Area
+
+data.temp.set <- data.temp.set %>%
+  mutate(property_area_rural = as.numeric(Property_Area=="Rural"),
+         property_area_semiurban = as.numeric(Property_Area=="Semiurban")) %>%
+  select(-Property_Area)
+summary(data.temp.set)
+
+```
+
+
+Now let us split the data
+
+```{r}
+#setting up the seed
+
+set.seed(2)
+
+#Now split the data in the Train and Test
+
+s = sample(1:nrow(data.temp.set), 0.7*nrow(data.temp.set))
+train.temp.set = data.temp.set[s,]
+test.set = data.temp.set[-s,]
+
+
+summary(train.temp.set)
+#Spliting the data in train and Validate
+s1 = sample(1:nrow(train.temp.set),0.7*nrow(train.temp.set))
+
+train.set = train.temp.set[s1,]
+
+summary(train.set)
+
+val.set = train.set[-s1,]
+summary(val.set)
+
+```
+
+
+Now let us do the VIF Computation for Train Set
+
+```{r}
+
+for_vif=lm(loan_status~. -Loan_ID,data=train.temp.set)
+sort(vif(for_vif),decreasing = T)
+formula(for_vif)
+summary(for_vif)
+
+
+```
+
+Now there was no any high VIF Value so we will not create a fit.set to remove the Loan_ID and then do the step wise fitting so we get the formula
+
+
+```{r}
+
+fit.set <- train.temp.set  %>%
+  select(-Loan_ID)
+
+#Apply the glm Function to get the model
+
+fit <- glm(loan_status~. , family = "binomial" , data = fit.set)
+
+# Now we will use the step function to reduce the variable
+
+fit <- step(fit)
+summary(fit)
+#Now let us get the formula and the summary
+
+formula(fit)
+
+```
+
+Now let us do the VIF Computation for Validation Set
+
+```{r}
+
+for_vif=lm(loan_status~. -Loan_ID,data=train.set)
+sort(vif(for_vif),decreasing = T)
+formula(for_vif)
+summary(for_vif)
+```
+
+Now there was no any high VIF Value so we will not create a fit.set1 to remove the Loan_ID and then do the step wise fitting so we get the formula                     
+
+```{r}
+
+fit.set1 <- train.set %>%
+  select(-Loan_ID)
+
+#Apply the glm Function to get the model
+
+fit1 <- glm(loan_status~. , family = "binomial" , data = fit.set1)
+
+# Now we will use the step function to reduce the variable
+
+fit1 <- step(fit1)
+summary(fit1)
+#Now let us get the formula and the summary
+
+formula(fit1)
+
+```
+
+
+Now we will get the common formula from the fit and fit1
+
+```{r}
+
+train_vars = names(fit$coefficients)
+val_vars = names(fit1$coefficients)
+
+train_vars[train_vars %in% val_vars][-1]
+
+paste(train_vars[train_vars %in% val_vars][-1], collapse = "+")
+
+train_vars
+val_vars
+
+# 
+# train_vars = names(fit_train$coefficients)
+# val_vars = names(fit_val$coefficients)
+# 
+# train_vars[train_vars %in% val_vars][-1]
+# 
+# paste(train_vars[train_vars %in% val_vars][-1], collapse = "+")
+```
+
+Now let us use this formula to predict the Loan status.
+
+```{r}
+
+fit_final = glm(loan_status ~ Credit_History+married+education+depenant_1 , family = "binomial" , data = val.set)
+
+val.set$score = predict(fit_final , new_data = val.set , type= "response")
+
+```
+
+Now it is time to do the KS Cut off Calculations and the other calculations from the confusion matirx
+
+```{r}
+#Determining the KS Cutoff
+
+# Let us create a data frame with Cutoff, True Positive, False Positive, False Negative, True Negative, #Positives and Negatives
+
+cutoff_data = data.frame(cutoff = 0 , TP =0 ,TN=0 ,FP=0,FN=0 ,P=0, N=0)
+
+#Let us genrate the sequense of data from 0 to 1 of 100 parts
+
+cutoffs = seq(0,1,length =100)
+
+#Now let us build the confusion Matrix data
+
+for(cutoff in cutoffs){
+  
+  predicted = as.numeric(val.set$score>cutoff)
+  
+  TP = sum(predicted == 1 & val.set$loan_status == 1)
+  TN = sum(predicted == 0 & val.set$loan_status == 0)
+  FP = sum(predicted == 1 & val.set$loan_status == 0)
+  FN = sum(predicted == 0 & val.set$loan_status == 1)
+  P = TP + FN
+  N = TN + FP
+  cutoff_data = rbind(cutoff_data, c(cutoff,TP,TN,FP,FN,P,N))
+}
+
+# removing the dummy data cotaining top row
+cutoff_data=cutoff_data[-1,]
+
+#KS Cut off os (TP/P)- (FP/N)
+
+cutoff_data=cutoff_data %>%
+  #Sensitivity  is rate of Rate of Positive 
+  mutate( Sn=TP/P,Sp=TN/N,dist=sqrt((1-Sn)**2+(1-Sp)**2)) %>%
+  mutate(KS=abs((TP/P)-(FP/N))) %>%
+  mutate(Accuracy=(TP+TN)/(P+N)) %>%
+  mutate(Lift=(TP/P)/((TP+FP)/(P+N))) %>%
+  mutate(M=(8*FN+2*FP)/(P+N)) %>%
+  select(-P,-N)
+
+```
+
+```{r}
+library(tidyr)
+cutoff_viz=cutoff_data %>%
+  select(cutoff,Sn,Sp,dist,KS,Accuracy,Lift,M) %>%
+  gather(Criterion,Value,Sn:M) 
+
+
+
+data.temp.set$score=predict(fit_final,newdata = data.temp.set,type = "response")
+
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))][1]
+
+table(y = data.temp.set$loan_status,cutoff = as.numeric(data.temp.set$score>KS_cutoff))
+```
+
+Now we will make the output file ready. We will check the data and then do the data cleaning of the file.
+
+We will clean the data which is used in our fitfinal data so we can avoid the efforts.
+
+
+```{r}
+
+output.set =read.csv("test.csv" , stringsAsFactors = FALSE)
+library(dplyr)
+glimpse(output.set)
+View(output.set)
+summary(output.set)
+
+shapiro.test(output.set$LoanAmount)
+# This is normal as the P value is less than 0.1
+
+#Replace the NA by the Mean
+output.set$LoanAmount[is.na(output.set$LoanAmount)] <- mean(output.set$LoanAmount , na.rm = T )
+
+
+shapiro.test(output.set$Loan_Amount_Term)
+# This is normal as the P value is less than 0.1
+#Replace the NA by the Mean
+output.set$Loan_Amount_Term[is.na(output.set$Loan_Amount_Term)] <- mean(output.set$Loan_Amount_Term , na.rm = T )
+
+
+#Replace the NA in Credit History
+
+output.set$Credit_History[is.na(output.set$Credit_History)] <- 1
+
+table(output.set$Credit_History)
+
+summary(output.set)
+
+```
+
+
+Now we will create the dummy variables for the output.
+```{r}
+
+
+table(output.set$Married)
+output.set <- output.set %>%
+  mutate(married = as.numeric(Married %in% c("Yes",""))) %>%
+  select(-Married)
+table(output.set$married)
+
+# Creating Dummy Variable for Dependants
+#Checking the Dependatants Data
+
+table(output.set$Dependents)
+output.set <- output.set %>%
+  mutate(depenant_0 = as.numeric(Dependents %in% c("0","")),
+         depenant_1 = as.numeric(Dependents== "1"),
+         depenant_2 = as.numeric(Dependents== "2"))%>%
+  select(-Dependents)
+
+# table(output.set$depenant_0)
+#Creating Dummy Variable for Education
+
+table(output.set$Education)
+output.set <- output.set %>%
+  mutate(education = as.numeric(Education == "Graduate"))%>%
+  select(-Education)
+
+output.set$score=predict(fit_final,newdata = output.set,type = "response")
+output.set$loan_status = as.logical(output.set$score>KS_cutoff)
+
+#Why to add the other coloumns so we can give what is in the test data.
+
+output.set1 =read.csv("test.csv" , stringsAsFactors = FALSE)
+output.set1$Loan_status <- output.set$loan_status
+
+write.csv(output.set1, file = "output.csv")
+
+
+```
+

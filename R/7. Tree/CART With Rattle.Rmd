@@ -1,0 +1,207 @@
+---
+title: "R Tree Notebook"
+output: html_notebook
+---
+
+
+C 5.0
+
+```{r}
+## ----message=FALSE,warning=FALSE-----------------------------------------
+library(tree)
+library(ISLR)
+library(dplyr)
+
+## ------------------------------------------------------------------------
+# Classification Model using C5.0
+##-------------------------------------------------------------------------
+mysales=Carseats %>%
+   mutate(High=as.factor(ifelse(Sales<=8,"No","Yes"))) %>%
+   select(-Sales)
+
+## ------------------------------------------------------------------------
+tree.carseats = tree(High~.,data=mysales)
+summary(tree.carseats)
+
+## ------------------------------------------------------------------------
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+
+## ------------------------------------------------------------------------
+tree.carseats
+
+## ------------------------------------------------------------------------
+# Classification Model using C5.0
+##-------------------------------------------------------------------------
+set.seed(2)
+train=sample(1:nrow(mysales), 200)
+mysales_train=mysales[train,]
+mysales_test=mysales[-train,]
+
+## ------------------------------------------------------------------------
+tree.carseats=tree(High~.,data=mysales_train)
+
+tree.pred=predict(tree.carseats,newdata=mysales_test,type="class")
+
+summary(tree.carseats)
+
+table(tree.pred,mysales_test$High)
+
+57/200
+
+## ------------------------------------------------------------------------
+# Pruning the Tree
+##-------------------------------------------------------------------------
+set.seed(3)
+cv.carseats= cv.tree(tree.carseats,FUN=prune.misclass)
+
+plot(cv.carseats$size,cv.carseats$dev,type="b")
+
+## ------------------------------------------------------------------------
+prune.carseats=prune.misclass(tree.carseats,best=2)
+?prune.misclass
+plot(prune.carseats)
+text(prune.carseats,pretty=0)
+
+## ------------------------------------------------------------------------
+prune.carseats
+
+## ------------------------------------------------------------------------
+tree.pred=predict(prune.carseats,mysales_test,type="class")
+table(tree.pred,mysales_test$High)
+46/200
+
+
+```
+
+CART WITH RATTLE
+
+```{r}
+## Let us first set the working directory path
+
+setwd ("C:/Govinda/PU2376/project/Desktop/Desktop/Data Science/Govinda Training/Trees")
+getwd()
+
+## Data Import
+CTDF.dev <- read.table("DEV_SAMPLE.csv", sep = ",", header = T)
+CTDF.holdout <- read.table("HOLDOUT_SAMPLE.csv", sep = ",", header = T)
+c(nrow(CTDF.dev), nrow(CTDF.holdout))
+str(CTDF.dev)
+
+
+
+## installing rpart package for CART
+## install.packages("rpart")
+## install.packages("rpart.plot")
+## loading the library
+library(rpart)
+library(rpart.plot)
+
+
+## Target Rate 
+sum(CTDF.dev$Target)/14000
+
+## setting the control paramter inputs for rpart
+r.ctrl = rpart.control(minsplit=100, minbucket = 10, cp = 0, xval = 5)
+
+
+## calling the rpart function to build the tree
+##m1 <- rpart(formula = Target ~ ., data = CTDF.dev[which(CTDF.dev$Holding_Period>10),-1], method = "class", control = r.ctrl)
+m1 <- rpart(formula = Target ~ ., data = CTDF.dev[,-1], method = "class", control = r.ctrl)
+m1
+plot(m1)
+text(m1,pretty=0)
+```
+
+Random Forest
+
+```{r}
+
+## ------------------------------------------------------------------------
+# Classification Model using Random Forest
+##-------------------------------------------------------------------------
+
+setwd ("/Users/gobo/Desktop/Data Science/Govinda Training/Govinda Training/Trees")
+library(dplyr)
+ld=read.csv("loans data.csv",stringsAsFactors = FALSE)
+ld=ld %>%
+  mutate(Interest.Rate=as.numeric(gsub("%","",Interest.Rate)) ,
+         Debt.To.Income.Ratio=as.numeric(gsub("%","",Debt.To.Income.Ratio)) ,
+         Open.CREDIT.Lines=as.numeric(Open.CREDIT.Lines) , 
+         Amount.Requested=as.numeric(Amount.Requested) ,
+         Amount.Funded.By.Investors=as.numeric(Amount.Funded.By.Investors),
+         Revolving.CREDIT.Balance=as.numeric(Revolving.CREDIT.Balance)
+         )
+ld= ld %>%
+  mutate(f1=as.numeric(substr(FICO.Range,1,3)),
+         f2=as.numeric(substr(FICO.Range,5,7)),
+         fico=0.5*(f1+f2)
+         ) %>%
+  select(-FICO.Range,-f1,-f2)
+
+ld = ld %>%
+  select(-Amount.Funded.By.Investors) %>%
+  na.omit()
+ld = ld %>%
+  select(-State) %>%
+  na.omit()
+## ------------------------------------------------------------------------
+for(i in 1:ncol(ld)){
+  if(class(ld[,i])=="character"){
+    ld[,i]=as.factor(ld[,i])
+  }
+}
+
+class(ld[,1])
+
+glimpse(ld)
+set.seed(2)
+train=sample(1:nrow(ld),0.6*nrow(ld))
+ld_train=ld[train,]
+ld_test=ld[-train,]
+
+
+## --------------------------------------------------------------
+ld.tree=tree(Interest.Rate~.-ID,data=ld_train)
+
+
+## --------------------------------------------------------------
+ld.tree=tree(Interest.Rate~.-ID,data=ld_train)
+ld.tree
+
+## ------------------------------------------------------------------------
+cv.ld.tree=cv.tree(ld.tree)
+plot(cv.ld.tree$size,cv.ld.tree$dev,type='b')
+
+## ------------------------------------------------------------------------
+sum((ld_test$Interest.Rate-predict(ld.tree,newdata=ld_test))**2) %>%
+  sqrt()
+
+## ----Random Forest ---------------------
+install.packages("randomForest")
+library(randomForest)
+class_rf=randomForest(High~.,data=mysales_train)
+class_rf
+
+## ------------------------------------------------------------------------
+forest.pred=predict(class_rf,newdata=mysales_test)
+table(mysales_test$High,forest.pred)
+(21+16)/200
+
+## ------------------------------------------------------------------------
+rf_ld=randomForest(Interest.Rate~.-ID,data=ld_train)
+rf_ld
+
+## ------------------------------------------------------------------------
+sum((ld_test$Interest.Rate-predict(rf_ld,newdata=ld_test))**2) %>%
+  sqrt()
+
+## ------------------------------------------------------------------------
+importance(class_rf)
+varImpPlot(class_rf)
+
+## ------------------------------------------------------------------------
+importance(rf_ld)
+varImpPlot(rf_ld)
+```
+

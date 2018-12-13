@@ -1,0 +1,53 @@
+setwd("F:/Data Science/04_Logistic Regression/Case Study 3")
+getwd()
+trainset=read.csv("train.csv", stringsAsFactors = FALSE)
+library(dplyr)
+glimpse(trainset)
+#table(trainset$Loan_Status)
+trainset=trainset %>%
+mutate(Gender=ifelse(substr(Gender,1,1)=="","Male",Gender),
+Gender=ifelse(Gender=="Male","0","1"),
+Gender=as.numeric(Gender),
+Married=ifelse(substr(Married,1,1)=="","No",Married),
+Married=ifelse(Married=="No","0","1"),
+Married=as.numeric(Married),
+Dependents=ifelse(substr(Dependents,1,1)=="",0,Dependents),
+Dependents=as.numeric(substr(Dependents,1,1)),
+Education=ifelse(Education=="Graduate",1,0),
+Self_Employed=ifelse(substr(Self_Employed,1,1)=="","No",Self_Employed),
+Self_Employed=ifelse(Self_Employed=="Yes",1,0),
+DS_Urban = as.numeric(Property_Area=="Urban"),
+DS_Semiurban = as.numeric(Property_Area=="Semiurban"),
+Loan_Status=as.numeric(ifelse(Loan_Status=="Y",1,0)))
+table(trainset$Gender)
+table(trainset$Married)
+table(trainset$Dependents)
+table(trainset$Self_Employed)
+table(trainset$Dependents)
+trainset = trainset %>%
+select(-Property_Area)
+glimpse(trainset)
+set.seed(2)
+s=sample(1:nrow(trainset),0.7*nrow(trainset))
+trainset_trainval=trainset[s,]
+trainset_test=trainset[-s,]
+s1=sample(1:nrow(trainset_trainval),0.7*nrow(trainset_trainval))
+trainset_train=trainset_trainval[s1,]
+trainset_val=trainset_trainval[-s1,]
+glimpse(trainset_train)
+library(car)
+vif1=lm(Loan_Status~.-Loan_ID,data=trainset_train)
+sort(vif(vif1), decreasing = T)
+summary(vif1)
+# Remove CoapplicantIncome as its pvalue > 0.05
+vif1=lm(Loan_Status~.-Loan_ID-CoapplicantIncome,data=trainset_train)
+sort(vif(vif1), decreasing = T)
+summary(vif1)
+#Remove ApplicantIncome
+vif1=lm(Loan_Status~.-Loan_ID-CoapplicantIncome-ApplicantIncome,data=trainset_train)
+sort(vif(vif1), decreasing = T)
+summary(vif1)
+#Remove Loan_Amount_Term
+vif1=lm(Loan_Status~.-Loan_ID-CoapplicantIncome-ApplicantIncome-Loan_Amount_Term,data=trainset_train)
+sort(vif(vif1), decreasing = T)
+summary(vif1)

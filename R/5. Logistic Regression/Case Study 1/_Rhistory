@@ -1,0 +1,512 @@
+table(data.temp.set$demographic_slice)
+data.temp.set <- data.temp.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+table(data.temp.set$country_reg)
+#Creating Dummy Variables for country_reg
+data.temp.set <- data.temp.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+#Creating Dummy Variablesfor ad_exp
+data.temp.set <- data.temp.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+---
+title: "R Notebook"
+output: html_notebook
+---
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+```{r}
+#Problem Statement:
+#==================
+#Since the problem statement has not been stated
+setwd("C:/Govinda/PU2376/project/Desktop/Desktop/Data Science/Edu Pristine/Yogesh Sir Batch/Logistic Regression/Case Study 1")
+getwd()
+library(dplyr)
+ds1 <- read.csv("ds1.csv", stringsAsFactors = F)
+ds2 <- read.csv("ds2.csv", stringsAsFactors = F)
+ds3 <- read.csv("ds3.csv", stringsAsFactors = F)
+ds4 <- read.csv("ds4.csv", stringsAsFactors = F)
+```
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+```{r}
+glimpse(ds4)
+```
+Categorical data : We need to create dummy varibales for this
+demographic_slice
+country_reg
+ad_exp
+card_offer
+```{r}
+data.temp.set <- as.data.frame(bind_rows(ds1, ds2, ds3))
+output.set  <- ds4
+View(data.temp.set)
+```
+```{r}
+#Creating Dummy Variables for demographic_slice
+table(data.temp.set$demographic_slice)
+data.temp.set <- data.temp.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+table(data.temp.set$country_reg)
+#Creating Dummy Variables for country_reg
+data.temp.set <- data.temp.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+#Creating Dummy Variablesfor ad_exp
+data.temp.set <- data.temp.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+```
+```{r}
+#Resetting the output variable card_offer as TRUE to be 1 and FALSE to be 0
+data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+str(data.temp.set)
+#Setting the seed to review
+set.seed(2)
+#Splitting the data in train and test
+s=sample(1:nrow(data.temp.set),0.7*nrow(data.temp.set))
+train.temp.set=data.temp.set[s,]
+test.set=data.temp.set[-s,]
+#Splitting the data in train and validation
+s1=sample(1:nrow(train.temp.set),0.7*nrow(train.temp.set))
+train.set=train.temp.set[s1,]
+val.set=train.temp.set[-s1,]
+library(car)
+for_vif=lm(card_offer~.-customer_id,data=train.set)
+sort(vif(for_vif), decreasing = T)
+#Getting the error "there are aliased coefficients in the model"
+#alias(lm(card_offer ~. -customer_id, data=train.set))
+#Found that the linear variables were DS_CARDIF2 and DS_BWEsk45
+#Hence removing DS_CARDIF2
+#for_vif=lm(card_offer~. -customer_id -DS_CARDIF2, data=train.set)
+#sort(vif(for_vif),decreasing = T)
+#Considering VIF to be 4 for the removal of auto corelation variables
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=train.set)
+sort(vif(for_vif),decreasing = T)
+#fit.set <- train.set %>%
+#  select(-customer_id, -imp_cscore)
+#Applying the glm function
+fit <- glm(card_offer~. -customer_id -imp_cscore, family="binomial", data=train.set)
+#Stepwise Variable Reduction by checking the quality of model using AIC (Akaikie Information Criteria)
+fit <- step(fit)
+#Getting the formula of the fit
+formula(fit)
+#Using the formula to check the significance of the variables
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs + DS_CARDIF2 + CR_East, data=train.set, family="binomial")
+summary(fit1)
+#Repeating all the steps done with the train data for the validation data
+library(car)
+for_vif=lm(card_offer~.-customer_id,data=val.set)
+sort(vif(for_vif), decreasing = T)
+#Getting the error "there are aliased coefficients in the model"
+#alias(lm(card_offer ~. -customer_id, data=val.set))
+#Found that the linear variables were DS_CARDIF2 and DS_BWEsk45
+#Hence removing DS_CARDIF2
+#for_vif=lm(card_offer~. -customer_id -DS_CARDIF2, data=val.set)
+#sort(vif(for_vif),decreasing = T)
+#Considering VIF to be 4 for the removal of auto corelation variables
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=val.set)
+sort(vif(for_vif),decreasing = T)
+library(dplyr)
+fit.set <- val.set %>%
+select(-customer_id, -imp_cscore)
+fit.set = fit.set %>%
+select(-customer_id)
+#Applying the glm function
+fit <- glm(card_offer~., family="binomial", data=fit.set)
+#Stepwise Variable Reduction by checking the quality of model using AIC (Akaikie Information Criteria)
+fit <- step(fit)
+#Getting the formula of the fit
+formula(fit)
+#Using the formula to check the significance of the variables
+fit2 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit2)
+#Displaying the formulae for fit1 and fit2 to compute the fit_final having common variables from both the formulae
+formula(fit1)
+formula(fit2)
+fit_final <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, family="binomial", data=train.set)
+summary(fit_final)
+#Getting the score
+val.set$score <- predict(fit_final, newdata = val.set, type = "response")
+```
+```{r}
+#Create Backup for train.set
+data.temp.set.bk <- data.temp.set
+library(ggplot2)
+ggplot(val.set, aes(y=card_offer, x=score, color=factor(card_offer))) + geom_point() + geom_jitter()
+#Determining the KS Cutoff
+cutoff_data=data.frame(cutoff=0,TP=0,FP=0,FN=0,TN=0,P=0,N=0)
+cutoffs=seq(0,1,length=100)
+for (cutoff in cutoffs){
+predicted=as.numeric(val.set$score>cutoff)
+TP=sum(predicted==1 & val.set$card_offer==1)
+FP=sum(predicted==1 & val.set$card_offer==0)
+FN=sum(predicted==0 & val.set$card_offer==1)
+TN=sum(predicted==0 & val.set$card_offer==0)
+P=FN+TP
+N=TN+FP
+cutoff_data=rbind(cutoff_data,c(cutoff,TP,FP,FN,TN,P,N))
+}
+# removing the dummy data cotaining top row
+cutoff_data=cutoff_data[-1,]
+cutoff_data=cutoff_data %>%
+mutate(Sn=TP/P, Sp=TN/N,dist=sqrt((1-Sn)**2+(1-Sp)**2)) %>%
+mutate(KS=abs((TP/P)-(FP/N))) %>%
+mutate(Accuracy=(TP+TN)/(P+N)) %>%
+mutate(Lift=(TP/P)/((TP+FP)/(P+N))) %>%
+mutate(M=(8*FN+2*FP)/(P+N)) %>%
+select(-P,-N)
+library(tidyr)
+cutoff_viz=cutoff_data %>%
+select(cutoff,Sn,Sp,dist,KS,Accuracy,Lift,M) %>%
+gather(Criterion,Value,Sn:M)
+ggplot(filter(cutoff_viz,Criterion!="Lift"),aes(x=cutoff,y=Value,color=Criterion))+
+geom_line()
+test.set$score=predict(fit_final,newdata = test.set,type = "response")
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))][1]
+table(y = test.set$card_offer,cutoff = as.numeric(test.set$score>KS_cutoff))
+#Accuracy of the model = (7184+1302)/(7184+490+24+1302) = 94.28%
+#Munching data for the output file
+#Creating Dummy Variables for demographic_slice
+output.set <- output.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+#Creating Dummy Variables for country_reg
+output.set <- output.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+#Creating Dummy Variablesfor ad_exp
+output.set <- output.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+#Creating the card_offer field to numeric
+output.set$card_offer <- as.numeric(output.set$card_offer)
+#Resetting the output variable card_offer as TRUE to be 1 and FALSE to be 0
+output.set$score=predict(fit_final,newdata = output.set,type = "response")
+output.set$card_offer = as.logical(output.set$score>KS_cutoff)
+write.csv(output.set, file = "DS4_output.csv")
+```
+val.set <- val.set %>%
+select(-customer_id, -imp_cscore)
+fit.set = val.set
+fit <- glm(card_offer~., family="binomial", data=fit.set)
+fit <- step(fit)
+fit <- step(fit)
+formula(fit)
+fit2 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+train.set <- train.set %>%
+select(-customer_id, -imp_cscore)
+fit.set <- train.set
+fit <- glm(card_offer~. , family="binomial", data=fit.set)
+fit <- glm(card_offer~. , family="binomial", data=fit.set)
+fit <- step(fit)
+formula(fit)
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit1)
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit1)
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs  + CR_East, data=fit.set, family="binomial")
+summary(fit1)
+fit <- step(fit)
+variables
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=train.set)
+#Setting the seed to review
+set.seed(2)
+#Splitting the data in train and test
+s=sample(1:nrow(data.temp.set),0.7*nrow(data.temp.set))
+train.temp.set=data.temp.set[s,]
+test.set=data.temp.set[-s,]
+#Splitting the data in train and validation
+s1=sample(1:nrow(train.temp.set),0.7*nrow(train.temp.set))
+train.set=train.temp.set[s1,]
+val.set=train.temp.set[-s1,]
+library(car)
+for_vif=lm(card_offer~.-customer_id,data=train.set)
+sort(vif(for_vif), decreasing = T)
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=train.set)
+sort(vif(for_vif),decreasing = T)
+train.set <- train.set %>%
+select(-customer_id, -imp_cscore)
+fit.set <- train.set
+fit <- glm(card_offer~. , family="binomial", data=fit.set)
+fit <- step(fit)
+fit <- step(fit)
+formula(fit)
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs  + CR_East, data=fit.set, family="binomial")
+summary(fit1)
+library(car)
+for_vif=lm(card_offer~.-customer_id,data=val.set)
+sort(vif(for_vif), decreasing = T)
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=val.set)
+sort(vif(for_vif),decreasing = T)
+library(dplyr)
+val.set <- val.set %>%
+select(-customer_id, -imp_cscore)
+fit.set = val.set
+fit <- glm(card_offer~., family="binomial", data=fit.set)
+fit <- step(fit)
+formula(fit)
+fit2 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit2)
+formula(fit1)
+formula(fit2)
+fit_final <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, family="binomial", data=train.set)
+summary(fit_final)
+val.set$score <- predict(fit_final, newdata = val.set, type = "response")
+val.set$score
+cutoff_data=data.frame(cutoff=0,TP=0,FP=0,FN=0,TN=0,P=0,N=0)
+cutoffs=seq(0,1,length=100)
+View(cutoff_data)
+cutoff_data=data.frame(cutoff=0,TP=0,FP=0,FN=0,TN=0,P=0,N=0)
+cutoffs=seq(0,1,length=100)
+for (cutoff in cutoffs){
+predicted=as.numeric(val.set$score>cutoff)
+TP=sum(predicted==1 & val.set$card_offer==1)
+FP=sum(predicted==1 & val.set$card_offer==0)
+FN=sum(predicted==0 & val.set$card_offer==1)
+TN=sum(predicted==0 & val.set$card_offer==0)
+P=FN+TP
+N=TN+FP
+cutoff_data=rbind(cutoff_data,c(cutoff,TP,FP,FN,TN,P,N))
+}
+View(cutoff_data)
+cutoff_data=cutoff_data[-1,]
+cutoff_data=cutoff_data %>%
+mutate(Sn=TP/P, Sp=TN/N,dist=sqrt((1-Sn)**2+(1-Sp)**2)) %>%
+mutate(KS=abs((TP/P)-(FP/N))) %>%
+mutate(Accuracy=(TP+TN)/(P+N)) %>%
+mutate(Lift=(TP/P)/((TP+FP)/(P+N))) %>%
+mutate(M=(8*FN+2*FP)/(P+N)) %>%
+select(-P,-N)
+View(cutoff_data)
+test.set$score=predict(fit_final,newdata = test.set,type = "response")
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))][1]
+table(y = test.set$card_offer,cutoff = as.numeric(test.set$score>KS_cutoff))
+setwd("/Users/gobo/Desktop/Data Science/Govinda Training/Govinda Training/Logistic Regression/Case Study 1")
+getwd()
+library(dplyr)
+ds1 <- read.csv("ds1.csv", stringsAsFactors = F)
+ds2 <- read.csv("ds2.csv", stringsAsFactors = F)
+ds3 <- read.csv("ds3.csv", stringsAsFactors = F)
+ds4 <- read.csv("ds4.csv", stringsAsFactors = F)
+library(dplyr)
+ds1 <- read.csv("ds1.csv", stringsAsFactors = F)
+ds2 <- read.csv("ds2.csv", stringsAsFactors = F)
+ds3 <- read.csv("ds3.csv", stringsAsFactors = F)
+ds4 <- read.csv("ds4.csv", stringsAsFactors = F)
+glimpse(ds1)
+data.temp.set <- as.data.frame(rbind_list(ds1, ds2, ds3))
+output.set  <- ds4
+data.temp.set.bk <- data.temp.set
+data.temp.set <- as.data.frame(rbind(ds1, ds2, ds3))
+data.temp.set1 <- as.data.frame(rbind(ds1, ds2, ds3))
+View(data.temp.set1)
+data.temp.set <- as.data.frame(rbind(ds1, ds2, ds3))
+output.set  <- ds4
+data.temp.set.bk <- data.temp.set
+table(data.temp.set$demographic_slice)
+#Creating Dummy Variables for demographic_slice
+data.temp.set <- data.temp.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+glimpse(data.temp.set)
+table(data.temp.set$country_reg)
+#Creating Dummy Variables for country_reg
+data.temp.set <- data.temp.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+table(data.temp.set$ad_exp)
+#Creating Dummy Variablesfor ad_exp
+data.temp.set <- data.temp.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+glimpse(data.temp.set)
+data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+glimpse(data.temp.set)
+set.seed(2)
+s=sample(1:nrow(data.temp.set),0.7*nrow(data.temp.set))
+s
+sample(1:10,5)
+nrow(data.temp.set)
+s=sample(1:nrow(data.temp.set),0.7*nrow(data.temp.set))
+train.temp.set=data.temp.set[s,]
+test.set=data.temp.set[-s,]
+which(data.temp.set$card_offer==TRUE)
+data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+a= data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+a
+data.temp.set <- as.data.frame(rbind(ds1, ds2, ds3))
+output.set  <- ds4
+data.temp.set.bk <- data.temp.set
+data.temp.set <- data.temp.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+data.temp.set <- data.temp.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+data.temp.set <- data.temp.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+which(data.temp.set$card_offer==TRUE)
+View(data.temp.set)
+data.temp.set$card_offer[which(data.temp.set$card_offer==TRUE)]=1
+View(data.temp.set)
+a = 1:10
+which(a==2)
+which(a==5)
+a
+a %in% 2
+a = 5:10
+which(a==5)
+#Setting the seed to review
+set.seed(2)
+#Splitting the data in train and test
+s=sample(1:nrow(data.temp.set),0.7*nrow(data.temp.set))
+train.temp.set=data.temp.set[s,]
+test.set=data.temp.set[-s,]
+#Splitting the data in train and validation
+s1=sample(1:nrow(train.temp.set),0.7*nrow(train.temp.set))
+train.set=train.temp.set[s1,]
+val.set=train.temp.set[-s1,]
+library(car)
+library(car)
+for_vif=lm(card_offer~.-customer_id,data=train.set)
+sort(vif(for_vif), decreasing = T)
+imp_cscore
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=train.set)
+sort(vif(for_vif),decreasing = T)
+fit.set <- train.set %>%
+select(-customer_id, -imp_cscore)
+fit <- glm(card_offer~., family="binomial", data=fit.set)
+fit
+fit <- step(fit)
+formula(fit)
+fit1 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + RiskScore +
+imp_crediteval + DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit1)
+formula(fit1)
+for_vif=lm(card_offer~.-customer_id,data=val.set)
+sort(vif(for_vif), decreasing = T)
+for_vif=lm(card_offer~. -customer_id -imp_cscore, data=val.set)
+sort(vif(for_vif),decreasing = T)
+fit.set <- val.set %>%
+select(-customer_id, -imp_cscore)
+fit <- glm(card_offer~., family="binomial", data=fit.set)
+fit <- step(fit)
+formula(fit)
+formula(fit)
+summary(fit)
+fit2 <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, data=fit.set, family="binomial")
+summary(fit2)
+formula(fit1)
+formula(fit2)
+train_vars=names(fit1$coefficients)
+val_vars=names(fit2$coefficients)
+train_vars
+val_vars
+train_vars %in% val_vars
+train_vars[train_vars %in% val_vars]
+fit_final <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, family="binomial", data=train.set)
+summary(fit_final)
+response
+val.set$score <- predict(fit_final, newdata = val.set, type = "response")
+val.set$score
+cutoff_data=data.frame(cutoff=0,TP=0,FP=0,FN=0,TN=0,P=0,N=0)
+View(cutoff_data)
+cutoffs=seq(0,1,length=100)
+cutoffs
+cutoff = cutoffs[1]
+cutoff
+cutoff = cutoffs[3]
+cutoff
+predicted=as.numeric(val.set$score>cutoff)
+predicted
+for (cutoff in cutoffs){
+predicted=as.numeric(val.set$score>cutoff)
+TP=sum(predicted==1 & val.set$card_offer==1)
+FP=sum(predicted==1 & val.set$card_offer==0)
+FN=sum(predicted==0 & val.set$card_offer==1)
+TN=sum(predicted==0 & val.set$card_offer==0)
+P=FN+TP
+N=TN+FP
+cutoff_data=rbind(cutoff_data,c(cutoff,TP,FP,FN,TN,P,N))
+}
+View(cutoff_data)
+cutoff_data=cutoff_data[-1,]
+cutoff_data=cutoff_data %>%
+mutate(Sn=TP/P, Sp=TN/N,dist=sqrt((1-Sn)**2+(1-Sp)**2)) %>%
+mutate(KS=abs((TP/P)-(FP/N))) %>%
+mutate(Accuracy=(TP+TN)/(P+N)) %>%
+mutate(Lift=(TP/P)/((TP+FP)/(P+N))) %>%
+mutate(M=(8*FN+2*FP)/(P+N)) %>%
+select(-P,-N)
+cutoff_data
+View(cutoff_data)
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))][1]
+KS_cutoff
+View(cutoff_data)
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))][1]
+cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))]
+KS_cutoff=cutoff_data$cutoff[which(cutoff_data$KS==max(cutoff_data$KS))]
+KS_cutoff
+cutoff = as.numeric(test.set$score>KS_cutoff)
+cutoff
+as.numeric(test.set$score>KS_cutoff)
+test.set$score>KS_cutoff
+test.set$score
+test.set$score=predict(fit_final,newdata = test.set,type = "response")
+as.numeric(test.set$score>KS_cutoff)
+table(y = test.set$card_offer,cutoff = as.numeric(test.set$score>KS_cutoff))
+(7079+1309)/(7079+1309+595+17)
+output.set <- output.set %>%
+mutate(DS_AX03efs = as.numeric(demographic_slice=="AX03efs"),
+DS_BWEsk45 = as.numeric(demographic_slice=="BWEsk45"),
+DS_CARDIF2 = as.numeric(demographic_slice=="CARDIF2")) %>%
+select(-demographic_slice)
+output.set <- output.set %>%
+mutate(CR_East = as.numeric(country_reg=="E")) %>%
+select(-country_reg)
+output.set <- output.set %>%
+mutate(AE_Yes = as.numeric(ad_exp=="Y")) %>%
+select(-ad_exp)
+output.set$card_offer <- as.numeric(output.set$card_offer)
+output.set$score=predict(fit_final,newdata = output.set,type = "response")
+formula(fit_final)
+output.set$score=predict(fit_final,newdata = output.set,type = "response")
+output.set$card_offer = as.logical(output.set$score>KS_cutoff)
+View(output.set)
+fit_final <- glm(card_offer ~ est_income + hold_bal + pref_cust_prob + imp_crediteval +
+DS_AX03efs + DS_CARDIF2 + CR_East, family="binomial", data=train.set)
+summary(fit_final)
+card_offer
+output.set$card_offer <- as.numeric(output.set$card_offer)
+output.set$score=predict(fit_final,newdata = output.set,type = "response")
+output.set$card_offer = as.logical(output.set$score>KS_cutoff)
+View(output.set
+)
